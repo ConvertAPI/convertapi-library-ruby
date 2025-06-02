@@ -2,7 +2,7 @@ require 'convert_api'
 require 'tmpdir'
 
 ConvertApi.configure do |config|
-  config.api_credentials = ENV['CONVERT_API_SECRET'] # your api secret or token
+  config.api_credentials = ENV['API_TOKEN'] # your api token
 end
 
 # Example of extracting first page from PDF and then chaining conversion PDF page to JPG.

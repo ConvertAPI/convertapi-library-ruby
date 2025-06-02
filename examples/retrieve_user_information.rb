@@ -1,7 +1,7 @@
 require 'convert_api'
 
 ConvertApi.configure do |config|
-  config.api_credentials = ENV['CONVERT_API_SECRET'] # your api secret or token
+  config.api_credentials = ENV['API_TOKEN'] # your api token
 end
 
 # Retrieve user information
