@@ -23,11 +23,11 @@ gem 'convert_api'
 
 ### Configuration
 
-You can get your credentials at https://www.convertapi.com/a/auth
+You can get your credentials at [https://www.convertapi.com/a/authentication](https://www.convertapi.com/a/authentication)
 
 ```ruby
 ConvertApi.configure do |config|
-  config.api_credentials = 'your-api-secret-or-token'
+  config.api_credentials = 'api-token'
 end
 ```
 
@@ -125,7 +125,7 @@ Find more advanced examples in the [examples/](https://github.com/ConvertAPI/con
 
 ## Development
 
-Run `CONVERT_API_SECRET=your_secret rake spec` to run the tests.
+Run `CONVERT_API_SECRET=your_api_token rake spec` to run the tests.
 
 To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
