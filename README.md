@@ -2,7 +2,7 @@
 
 
 [![Gem](https://img.shields.io/gem/v/convert_api.svg)](https://rubygems.org/gems/convert_api)
-[![Build Status](https://github.com/ConvertAPI/convertapi-ruby/actions/workflows/main.yml/badge.svg)](https://github.com/ConvertAPI/convertapi-ruby/actions)
+[![Build](https://github.com/ConvertAPI/convertapi-library-ruby/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/ConvertAPI/convertapi-library-ruby/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 
@@ -120,18 +120,21 @@ end
 
 ### More examples
 
-Find more advanced examples in the [examples/](https://github.com/ConvertAPI/convertapi-ruby/tree/master/examples) folder.
+Find more advanced examples in the [examples/](https://github.com/ConvertAPI/convertapi-library-ruby/tree/main/examples) folder.
 
 
 ## Development
 
-Run `CONVERT_API_SECRET=your_api_token rake spec` to run the tests.
+Run `bundle exec rake spec` to run the specs. Without an API token only the offline specs run; with
+`CONVERT_API_SECRET=your_api_token bundle exec rake spec` the specs that call ConvertAPI run too
+(set `CONVERT_API_BASE_URI` to test against another deployment).
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+To install this gem onto your local machine, run `bundle exec rake install`. Releases are published from
+GitHub Releases only; see [RELEASING.md](RELEASING.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/ConvertAPI/convertapi-ruby. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/ConvertAPI/convertapi-library-ruby. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
 
 ## License
 

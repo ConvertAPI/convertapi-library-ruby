@@ -10,7 +10,8 @@ require 'convert_api/file_param'
 require 'convert_api/format_detector'
 
 module ConvertApi
-  URI_REGEXP = URI::regexp(%w(http https))
+  # URI.regexp is obsolete since Ruby 3.4 and warns; the RFC 2396 parser is what it always used.
+  URI_REGEXP = (defined?(URI::RFC2396_PARSER) ? URI::RFC2396_PARSER : URI::DEFAULT_PARSER).make_regexp(%w(http https))
   DEFAULT_URL_FORMAT = 'url'
 
   module_function

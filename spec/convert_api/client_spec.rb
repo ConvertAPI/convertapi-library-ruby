@@ -1,7 +1,7 @@
 RSpec.describe ConvertApi::Client do
   let(:client) { described_class.new }
 
-  describe '#upload' do
+  describe '#upload', live: true do
     subject { client.upload(io, File.basename(io.path)) }
 
     let(:io) { File.open('examples/files/test.docx') }
