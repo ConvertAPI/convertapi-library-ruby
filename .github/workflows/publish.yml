@@ -1,21 +1,276 @@
-name: Publish gem to rubygems
+name: Publish
+run-name: Publishing convert_api ${{ github.event.release.tag_name }} to RubyGems
+
+# A release is a GitHub Release, never a merge. Merging to main only builds (build.yml); publishing the
+# Release v{semver} runs this file, which checks that the tag's commit is on main and carries the tag's
+# version, tests it, builds the gem and pushes it to RubyGems. RubyGems versions are public and permanent -
+# a version can never be pushed again, even after it is yanked - so nothing here retries, overwrites or
+# skips an existing version.
+#
+#   gh release create v3.0.1 --target main --generate-notes              -> convert_api 3.0.1
+#   gh release create v3.1.0-rc.1 --target main --prerelease ...         -> convert_api 3.1.0.rc.1
+#
+# RubyGems Trusted Publishing trusts this file by name (publish.yml) and the rubygems environment, so
+# neither may be renamed without changing the trusted publisher on
+# https://rubygems.org/gems/convert_api/trusted_publishers
 on:
   release:
     types: [published]
+
+permissions:
+  contents: read
+
+env:
+  # Only this account may publish a Release that reaches RubyGems. GitHub cannot express this as a
+  # permission on the Team plan, so it is checked here (in both jobs, as either can be re-run on its own);
+  # the real controls are the v* tag ruleset (only repository admins create v* tags) and the rubygems
+  # environment, which accepts only v* tags.
+  PUBLISHER: tomasr78
+  GEM: convert_api
+
+concurrency:
+  group: publish-rubygems
+  cancel-in-progress: false
+
 jobs:
-  build:
+  package:
+    name: package
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      sha: ${{ steps.tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: ruby/setup-ruby@v1
+      - name: Check who published the release
+        run: |
+          # A re-run keeps GITHUB_ACTOR as the original user; GITHUB_TRIGGERING_ACTOR is whoever pressed
+          # "Re-run", so both must be the publisher or anyone with write access could replay a release.
+          if [ "$GITHUB_ACTOR" != "$PUBLISHER" ] || [ "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}" != "$PUBLISHER" ]; then
+            echo "::error::Only $PUBLISHER may publish to RubyGems - this release was published by $GITHUB_ACTOR and run by ${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}."
+            exit 1
+          fi
+          echo "Published by $GITHUB_ACTOR"
 
-      # setup .gem/credentials
-      - run: mkdir -p ~/.gem
-      - env:
+      # The release event runs this file from the tag, so the workflow and the code come from the same commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@824c0e29fdfc7d689c191c27acc969d2d04b7dd8 # v1.331.0
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+
+      - name: Check the tag and the version
+        id: tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+          # SemVer 2.0 without build metadata. RubyGems writes pre-releases with dots, so the only
+          # pre-release labels are alpha.N, beta.N and rc.N (v3.1.0-rc.1 -> 3.1.0.rc.1).
+          SEMVER='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$'
+          if ! [[ "$TAG" =~ $SEMVER ]]; then
+            echo "::error::Tag '$TAG' is not v{major}.{minor}.{patch} or v{major}.{minor}.{patch}-{alpha|beta|rc}.{n}, e.g. v3.0.1 or v3.1.0-rc.1"
+            exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+          PRE="${BASH_REMATCH[4]}"
+          if [ -n "$PRE" ]; then
+            VERSION="$VERSION.${BASH_REMATCH[5]}.${BASH_REMATCH[6]}"
+          fi
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::The run is on $GITHUB_REF, not on the release tag refs/tags/$TAG"
+            exit 1
+          fi
+          SHA=$(git rev-parse "refs/tags/$TAG^{commit}")
+          if [ "$(git rev-parse HEAD)" != "$SHA" ]; then
+            echo "::error::Checked out $(git rev-parse HEAD), but $TAG points at $SHA"
+            exit 1
+          fi
+
+          # The GitHub "pre-release" tick and the version must agree, so a pre-release cannot become the
+          # gem's latest stable version by a forgotten tick, and a stable version cannot hide as a pre-release.
+          if [ -n "$PRE" ]; then
+            if [ "$PRERELEASE" != true ]; then
+              echo "::error::$TAG is a pre-release version, so the GitHub Release must be marked as a pre-release (gh release create --prerelease)"
+              exit 1
+            fi
+          elif [ "$PRERELEASE" = true ]; then
+            echo "::error::$TAG is a stable version, but the GitHub Release is marked as a pre-release. Use a pre-release version such as ${TAG}-rc.1, or untick pre-release."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "::error::$TAG ($SHA) is not on main. Releases, pre-releases included, are tagged on main only."
+            exit 1
+          fi
+
+          # ConvertApi::VERSION is the gem's version and goes into the User-Agent of every request, so the
+          # tagged commit must carry the tag's version.
+          CONSTANT=$(ruby -Ilib -rconvert_api/version -e 'print ConvertApi::VERSION')
+          if [ "$CONSTANT" != "$VERSION" ]; then
+            echo "::error file=lib/convert_api/version.rb::ConvertApi::VERSION is '$CONSTANT' at $TAG, not '$VERSION'. Delete this Release and its tag (nothing was published), bump the version in a pull request, then release again."
+            exit 1
+          fi
+
+          # RubyGems answers 200 for a version it has and 404 for one it does not. A yanked version answers
+          # 404 too, but RubyGems refuses to take it again, so the push fails.
+          STATUS=$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' "https://rubygems.org/api/v2/rubygems/$GEM/versions/$VERSION.json")
+          case "$STATUS" in
+            404) ;;
+            200) echo "::error::$GEM $VERSION already exists on RubyGems and can never be pushed again. Release the next version instead."; exit 1 ;;
+            *)   echo "::error::Could not ask RubyGems whether $GEM $VERSION exists (HTTP $STATUS)"; exit 1 ;;
+          esac
+          if [ -z "$PRE" ]; then
+            LATEST=$(curl -fsS --retry 3 "https://rubygems.org/api/v1/gems/$GEM.json" | jq -r '.version')
+            if [ "$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -n1)" != "$VERSION" ]; then
+              echo "::warning::$VERSION is lower than the latest version $LATEST, so it will not become the version that new installs get."
+            fi
+          fi
+
+          {
+            echo "version=$VERSION"
+            echo "sha=$SHA"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing $GEM $VERSION from $SHA"
+
+      # Every spec; the ones that call ConvertAPI (live: true) run when the CONVERTAPI_SECRET secret exists,
+      # against CONVERTAPI_BASE_URI (a variable) when set.
+      - name: Specs
+        env:
+          CONVERT_API_SECRET: ${{ secrets.CONVERTAPI_SECRET }}
+          CONVERT_API_BASE_URI: ${{ vars.CONVERTAPI_BASE_URI }}
+        run: |
+          if [ -z "$CONVERT_API_SECRET" ]; then
+            echo "::warning::The CONVERTAPI_SECRET secret is not set, so the specs that call ConvertAPI are skipped."
+          fi
+          bundle exec rake spec
+
+      - name: Build the gem
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gem build "$GEM.gemspec" --output "dist/$GEM-$VERSION.gem"
+          test "$(ls dist | wc -l)" -eq 1
+          test "$(ruby -rrubygems/package -e 'print Gem::Package.new(ARGV[0]).spec.version' "dist/$GEM-$VERSION.gem")" = "$VERSION"
+          gem spec "dist/$GEM-$VERSION.gem" files
+
+      # Installed outside the checkout, so this loads what users get.
+      - name: Check the gem installs
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          GEM_HOME="$RUNNER_TEMP/gems" gem install --local --no-document "dist/$GEM-$VERSION.gem"
+          cd "$RUNNER_TEMP"
+          GEM_HOME="$RUNNER_TEMP/gems" GEM_PATH="$RUNNER_TEMP/gems" ruby -W -e '
+            require "convert_api"
+            abort "loaded #{ConvertApi::VERSION}, expected #{ARGV[0]}" unless ConvertApi::VERSION == ARGV[0]
+            abort "loaded from #{$LOADED_FEATURES.grep(/convert_api\.rb\z/)}" unless $LOADED_FEATURES.grep(/convert_api\.rb\z/).all? { |f| f.start_with?(ENV["GEM_HOME"]) }
+            puts ConvertApi::Client::USER_AGENT' "$VERSION"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gem
+          path: dist/
+          retention-days: 90
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: rubygems
+      url: https://rubygems.org/gems/convert_api/versions/${{ needs.package.outputs.version }}
+    permissions:
+      contents: read
+      # Only for RubyGems Trusted Publishing, which trades this job's OIDC token for a short-lived push
+      # token. Nothing in this job runs the repository's code.
+      id-token: write
+    steps:
+      - name: Check who published the release
+        run: |
+          if [ "$GITHUB_ACTOR" != "$PUBLISHER" ] || [ "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}" != "$PUBLISHER" ]; then
+            echo "::error::Only $PUBLISHER may publish to RubyGems - this release was published by $GITHUB_ACTOR and run by ${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}."
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: gem
+          path: dist/
+
+      - name: Check the gem again
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          ls -l dist
+          test -f "dist/$GEM-$VERSION.gem"
+          test "$(ls dist | wc -l)" -eq 1
+
+      - uses: ruby/setup-ruby@824c0e29fdfc7d689c191c27acc969d2d04b7dd8 # v1.331.0
+        with:
+          ruby-version: '3.4'
+
+      # Trusted Publishing: no stored key. This step fails while no trusted publisher exists on RubyGems.
+      - name: Get a push token by Trusted Publishing
+        id: oidc
+        continue-on-error: true
+        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
+
+      # TEMPORARY: until the trusted publisher exists, fall back to the RUBYGEMS_API_KEY repository secret.
+      # Once a release has gone out by Trusted Publishing, delete that secret and this step.
+      - name: Fall back to the RUBYGEMS_API_KEY secret
+        id: apikey
+        if: steps.oidc.outcome != 'success'
+        env:
           RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
-        run: >-
-          echo -e "---\n:rubygems_api_key: ${RUBYGEMS_API_KEY}" > ~/.gem/credentials
-      - run: chmod 0600 ~/.gem/credentials
+        run: |
+          if [ -z "$RUBYGEMS_API_KEY" ]; then
+            echo "::error::Trusted Publishing failed and there is no RUBYGEMS_API_KEY secret. Check the trusted publisher on https://rubygems.org/gems/$GEM/trusted_publishers (repository ConvertAPI/convertapi-library-ruby, workflow publish.yml, environment rubygems)."
+            exit 1
+          fi
+          echo "::warning::Trusted Publishing failed, so this release is pushed with the RUBYGEMS_API_KEY secret. Add the trusted publisher on https://rubygems.org/gems/$GEM/trusted_publishers"
+          echo "GEM_HOST_API_KEY=$RUBYGEMS_API_KEY" >> "$GITHUB_ENV"
 
-      - run: gem build convert_api.gemspec --output=release.gem
-      - run: gem push release.gem
+      - name: Push to RubyGems
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: gem push "dist/$GEM-$VERSION.gem"
+
+      # RubyGems serves a push within seconds, but its index and CDN can lag. A slow index is not a failed
+      # release, so this only warns.
+      - name: Wait for RubyGems to serve the gem
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -uo pipefail
+          for _ in $(seq 1 20); do
+            if curl -fsS -o /dev/null "https://rubygems.org/api/v2/rubygems/$GEM/versions/$VERSION.json"; then
+              echo "$GEM $VERSION is available on RubyGems"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::warning::$GEM $VERSION was pushed but RubyGems has not served it after 10 minutes. Check https://rubygems.org/gems/$GEM/versions/$VERSION"
+
+      - name: Summary
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+          SHA: ${{ needs.package.outputs.sha }}
+          AUTH: ${{ steps.oidc.outcome == 'success' && 'Trusted Publishing' || 'RUBYGEMS_API_KEY secret (fallback)' }}
+        run: |
+          {
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Gem | [\`$GEM $VERSION\`](https://rubygems.org/gems/$GEM/versions/$VERSION) |"
+            echo "| Commit | \`$SHA\` |"
+            echo "| Published with | $AUTH |"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,6 @@
 require 'net/https'
 require 'uri'
-require 'cgi'
+require 'cgi/escape'
 require 'json'
 
 module ConvertApi

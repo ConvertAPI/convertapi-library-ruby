@@ -39,7 +39,7 @@ RSpec.describe ConvertApi do
     let(:params) { { File: 'examples/files/test.docx' } }
 
     shared_examples 'successful conversion' do
-      it 'returns result' do
+      it 'returns result', live: true do
         expect(subject).to be_instance_of(ConvertApi::Result)
         expect(subject.conversion_cost).to be_a_kind_of(Integer)
         expect(subject.files).not_to be_empty
@@ -89,7 +89,7 @@ RSpec.describe ConvertApi do
       it_behaves_like 'successful conversion'
     end
 
-    context 'when has error' do
+    context 'when has error', live: true do
       it 'raises error without credentials' do
         described_class.config.api_credentials = nil
 
@@ -112,7 +112,7 @@ RSpec.describe ConvertApi do
     end
   end
 
-  describe '.user' do
+  describe '.user', live: true do
     subject { described_class.user }
 
     it 'returns user information' do
