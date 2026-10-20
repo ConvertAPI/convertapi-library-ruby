@@ -90,15 +90,13 @@ jobs:
             echo "::error file=lib/convert_api/version.rb::ConvertApi::VERSION '$VERSION' is not {major}.{minor}.{patch} or {major}.{minor}.{patch}.{alpha|beta|rc}.{n}"
             exit 1
           fi
-          BASE="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
-          LATEST=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -n1)
-          if [ -n "$LATEST" ] && [ "$(printf '%s\n%s\n' "$LATEST" "$BASE" | sort -V | tail -n1)" != "$BASE" ]; then
+          # The highest release so far, pre-releases included (v3.1.0-rc.2 is gem version 3.1.0.rc.2). Gem::Version
+          # sorts a pre-release below its release, so this also refuses a pre-release of a released version.
+          LATEST=$(git tag --list 'v*' | ruby -e '
+            tags = $stdin.read.split.grep(/\Av\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?\z/)
+            print tags.map { |t| Gem::Version.new(t.delete_prefix("v").tr("-", ".")) }.max')
+          if [ -n "$LATEST" ] && ! ruby -e 'exit Gem::Version.new(ARGV[0]) >= Gem::Version.new(ARGV[1])' "$VERSION" "$LATEST"; then
             echo "::error file=lib/convert_api/version.rb::ConvertApi::VERSION $VERSION is lower than the latest release $LATEST"
-            exit 1
-          fi
-          # A pre-release sorts below its release, so a pre-release of the latest release is a step back.
-          if [ "$VERSION" != "$BASE" ] && [ "$BASE" = "$LATEST" ]; then
-            echo "::error file=lib/convert_api/version.rb::ConvertApi::VERSION $VERSION is a pre-release of $LATEST, which is already released"
             exit 1
           fi
           {
@@ -138,7 +136,7 @@ jobs:
           {
             echo "| | |"
             echo "|---|---|"
-            echo "| \`ConvertApi::VERSION\` | \`$VERSION\` (latest release: \`v$LATEST\`) |"
+            echo "| \`ConvertApi::VERSION\` | \`$VERSION\` (latest release: \`$LATEST\`) |"
             echo "| Gem | \`convert_api-$VERSION.gem\` (artifact only, not published) |"
             echo "| Ruby | 3.2, 3.3, 3.4, 4.0 |"
           } >> "$GITHUB_STEP_SUMMARY"
