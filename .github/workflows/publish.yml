@@ -57,7 +57,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: ruby/setup-ruby@b1da4809b005e0178fe08a1d57317bffc00b7b4c # v1.332.0
+      - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
         with:
           ruby-version: '3.4'
           bundler-cache: true
@@ -215,7 +215,7 @@ jobs:
           test -f "dist/$GEM-$VERSION.gem"
           test "$(ls dist | wc -l)" -eq 1
 
-      - uses: ruby/setup-ruby@b1da4809b005e0178fe08a1d57317bffc00b7b4c # v1.332.0
+      - uses: ruby/setup-ruby@7f797815d8adceb1c412e7abefdd1ab4abc47a5f # v1.335.0
         with:
           ruby-version: '3.4'
 
