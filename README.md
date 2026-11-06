@@ -122,6 +122,13 @@ end
 
 Find more advanced examples in the [examples/](https://github.com/ConvertAPI/convertapi-library-ruby/tree/main/examples) folder.
 
+- [conversions_chaining.rb](https://github.com/ConvertAPI/convertapi-library-ruby/blob/main/examples/conversions_chaining.rb) - Chain two conversions: PDF to JPG images, then the images to a ZIP
+- [convert_stream.rb](https://github.com/ConvertAPI/convertapi-library-ruby/blob/main/examples/convert_stream.rb) - Convert text from an in-memory stream to PDF
+- [convert_url_to_pdf.rb](https://github.com/ConvertAPI/convertapi-library-ruby/blob/main/examples/convert_url_to_pdf.rb) - Convert a web page URL to PDF
+- [convert_word_to_pdf_and_png.rb](https://github.com/ConvertAPI/convertapi-library-ruby/blob/main/examples/convert_word_to_pdf_and_png.rb) - Convert one Word DOCX file to PDF and to PNG
+- [retrieve_user_information.rb](https://github.com/ConvertAPI/convertapi-library-ruby/blob/main/examples/retrieve_user_information.rb) - Retrieve your ConvertAPI account information
+- [split_and_merge_pdf.rb](https://github.com/ConvertAPI/convertapi-library-ruby/blob/main/examples/split_and_merge_pdf.rb) - Split a PDF and merge its first and last pages into a new PDF
+
 
 ## Development
 
