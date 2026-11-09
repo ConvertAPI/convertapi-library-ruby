@@ -6,7 +6,7 @@ ConvertApi.configure do |config|
 end
 
 # Example of converting Web Page URL to PDF file
-# https://www.convertapi.com/web-to-pdf
+# https://www.convertapi.com/html-to-pdf
 
 result = ConvertApi.convert(
   'pdf',
@@ -14,7 +14,7 @@ result = ConvertApi.convert(
     Url: 'https://en.wikipedia.org/wiki/Data_conversion',
     FileName: 'web-example'
   },
-  from_format: 'web',
+  from_format: 'html',
   conversion_timeout: 180,
 )
 
