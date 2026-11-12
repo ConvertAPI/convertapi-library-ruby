@@ -34,7 +34,7 @@ end
 ### File conversion
 
 Example to convert file to PDF. All supported formats and options can be found
-[here](https://www.convertapi.com/doc/supported-formats).
+[here](https://www.convertapi.com/api).
 
 ```ruby
 result = ConvertApi.convert('pdf', { File: '/path/to/my_file.docx' })
@@ -67,7 +67,7 @@ result = ConvertApi.convert('pdf', { File: 'https://website/my_file.docx' })
 ```ruby
 result = ConvertApi.convert(
   'pdf', 
-  {File: /path/to/my_file'}, 
+  { File: '/path/to/my_file' },
   from_format: 'docx'
 )
 ```
@@ -75,14 +75,14 @@ result = ConvertApi.convert(
 #### Additional conversion parameters
 
 ConvertAPI accepts extra conversion parameters depending on converted formats. All conversion 
-parameters and explanations can be found [here](https://www.convertapi.com/doc/supported-formats).
+parameters and explanations can be found [here](https://www.convertapi.com/api).
 
 ```ruby
 result = ConvertApi.convert(
-  'pdf', 
-  {File: /path/to/my_file.docx',
-  PageRange: '1-10',
-  PdfResolution: '150'}
+  'pdf',
+  { File: '/path/to/my_file.docx',
+    PageRange: '1-10',
+    Pdfa: true }
 )
 ```
 
@@ -99,7 +99,7 @@ puts result.files[0].size
 
 ### User information
 
-You can always check your usage by fetching [user information](https://www.convertapi.com/doc/user).
+You can always check your usage by fetching [user information](https://www.convertapi.com/docs/user-information).
 
 ```ruby
 user_info = ConvertApi.user
@@ -109,7 +109,7 @@ puts user_info['ConversionsConsumed']
 
 ### Alternative domain
 
-Set config `base_uri` attribute to use other service domains. Dedicated to the region [domain list](https://www.convertapi.com/doc/servers-location).
+Set config `base_uri` attribute to use other service domains. Dedicated to the region [domain list](https://www.convertapi.com/docs/servers-location).
 
 ```ruby
 ConvertApi.configure do |config|
@@ -142,7 +142,7 @@ GitHub Releases only; see [RELEASING.md](RELEASING.md) and [CHANGELOG.md](CHANGE
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/ConvertAPI/convertapi-library-ruby. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/ConvertAPI/convertapi-library-ruby. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](https://www.contributor-covenant.org) code of conduct.
 
 ## License
 
